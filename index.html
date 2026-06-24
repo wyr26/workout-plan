@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Workout Tracker</title>
+  <!-- repo: https://github.com/wyr26/workout-plan -->
+  <style>
+    /* ── TOKENS ─────────────────────────────────────────────── */
+    :root {
+      --bg:          #0f0f13;
+      --surface:     #18181e;
+      --surface-hi:  #222229;
+      --border:      #252533;
+      --text:        #f0f0f4;
+      --muted:       #6e6e82;
+      --dim:         #35354a;
+      --pull:        #7ba7ff;
+      --push:        #ff8c5a;
+      --legs:        #5ec981;
+      --danger:      #e05252;
+      --success:     #3dba7a;
+      --r:           12px;
+      --r-sm:        8px;
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bot:    env(safe-area-inset-bottom, 0px);
+    }
+
+    /* ── RESET ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      font-size: 16px;
+    }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    input  { font-family: inherit; }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input[type="number"] { -moz-appearance: textfield; }
+
+    /* ── LAYOUT ─────────────────────────────────────────────── */
+    #app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding-bottom: calc(var(--safe-bot) + 80px);
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    .hdr {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: calc(var(--safe-top) + 24px) 20px 16px;
+    }
+    .hdr-back {
+      width: 36px; height: 36px;
+      background: var(--surface);
+      border-radius: 50%;
+      color: var(--text);
+      font-size: 22px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .hdr-back:active { background: var(--surface-hi); }
+    .hdr-title { font-size: 22px; font-weight: 800; letter-spacing: -.4px; }
+    .hdr-sub   { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* ── HOME ───────────────────────────────────────────────── */
+    .home { padding: calc(var(--safe-top) + 28px) 20px 0; }
+    .home-greeting { font-size: 30px; font-weight: 800; letter-spacing: -.6px; line-height: 1.2; }
+    .home-sub { font-size: 14px; color: var(--muted); margin: 6px 0 28px; }
+    .sec-label {
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 1.2px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 10px;
+    }
+    .day-cards { display: flex; flex-direction: column; gap: 10px; }
+    .day-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 16px 14px 16px 0;
+      display: flex; align-items: center; gap: 14px;
+      cursor: pointer;
+      -webkit-user-select: none; user-select: none;
+    }
+    .day-card:active { background: var(--surface-hi); }
+    .day-stripe { width: 4px; align-self: stretch; min-height: 44px; border-radius: 0 3px 3px 0; flex-shrink: 0; }
+    .day-body { flex: 1; min-width: 0; }
+    .day-type { font-size: 19px; font-weight: 800; letter-spacing: -.3px; }
+    .day-exs  { font-size: 12px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .day-right { text-align: right; flex-shrink: 0; }
+    .day-date { font-size: 12px; color: var(--muted); }
+    .day-ago  { font-size: 12px; font-weight: 600; margin-top: 2px; }
+    .day-arrow { font-size: 22px; color: var(--dim); flex-shrink: 0; margin-right: 4px; }
+
+    /* ── LOG ────────────────────────────────────────────────── */
+    .log { padding: 0 16px; }
+
+    .ex-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .ex-hdr {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 13px 10px 11px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ex-name {
+      font-size: 15px; font-weight: 700; line-height: 1.3;
+      cursor: pointer; flex: 1;
+    }
+    .ex-name:active { opacity: .7; }
+    .ex-hint { font-size: 11px; color: var(--dim); margin-top: 3px; }
+    .ex-remove { color: var(--dim); font-size: 24px; line-height: 1; padding: 0 4px 0 12px; flex-shrink: 0; }
+    .ex-remove:active { color: var(--danger); }
+
+    /* Set rows — signature element: scoreboard readout */
+    .set-row {
+      display: grid;
+      grid-template-columns: 28px 1fr 1fr;
+      gap: 8px; align-items: center;
+      padding: 10px 14px 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .set-row:last-child { border-bottom: none; }
+    .set-num { font-size: 10px; font-weight: 700; color: var(--dim); text-align: center; letter-spacing: .4px; }
+    .set-field { display: flex; flex-direction: column; gap: 3px; }
+    .set-input {
+      width: 100%;
+      background: var(--surface-hi);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text);
+      font-size: 22px; font-weight: 800;
+      text-align: center;
+      padding: 10px 4px;
+      -webkit-appearance: none;
+    }
+    .set-input:focus { outline: none; background: rgba(255,255,255,.04); }
+    .set-input::placeholder { color: var(--dim); font-size: 17px; font-weight: 400; }
+    .set-unit { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); text-align: center; }
+
+    /* day-aware focus ring */
+    [data-day="Pull"] .set-input:focus { border-color: var(--pull); }
+    [data-day="Push"] .set-input:focus { border-color: var(--push); }
+    [data-day="Legs"] .set-input:focus { border-color: var(--legs); }
+
+    .add-ex-btn {
+      width: 100%;
+      border: 1.5px dashed var(--border);
+      border-radius: var(--r);
+      color: var(--muted); font-size: 15px;
+      padding: 15px; margin-bottom: 10px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .add-ex-btn:active { border-color: var(--success); color: var(--success); }
+
+    .finish-btn {
+      width: 100%;
+      background: var(--success); color: #fff;
+      font-size: 16px; font-weight: 700;
+      padding: 18px; border-radius: var(--r); letter-spacing: .1px;
+    }
+    .finish-btn:active { opacity: .85; }
+    .finish-btn:disabled { opacity: .45; cursor: default; }
+
+    /* ── HISTORY ─────────────────────────────────────────────── */
+    .history { padding: 0 16px; }
+    .hist-meta { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+    .hist-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+    .hist-table { width: 100%; border-collapse: collapse; }
+    .hist-table th {
+      font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
+      color: var(--muted); padding: 10px 14px; text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .hist-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .hist-table tr:last-child td { border-bottom: none; }
+    .td-date { font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .td-date-tag { font-size: 10px; font-weight: 700; margin-top: 2px; }
+    .td-set { font-size: 12px; color: var(--dim); text-align: center; }
+    .td-num { font-size: 17px; font-weight: 800; }
+    .td-num span { font-size: 11px; font-weight: 400; color: var(--muted); }
+
+    /* ── SHARED STATES ───────────────────────────────────────── */
+    .err {
+      background: rgba(224,82,82,.1); border: 1px solid rgba(224,82,82,.3);
+      border-radius: var(--r-sm); color: var(--danger);
+      font-size: 14px; padding: 12px 16px; margin-bottom: 12px;
+    }
+    .empty { text-align: center; padding: 52px 20px; color: var(--muted); }
+    .empty-icon { font-size: 32px; margin-bottom: 10px; }
+    .empty-text { font-size: 15px; }
+    .spinner { text-align: center; padding: 52px 20px; color: var(--muted); font-size: 14px; }
+
+    /* ── ADD EXERCISE SHEET ──────────────────────────────────── */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 100; display: flex; align-items: flex-end; }
+    .sheet {
+      background: var(--surface); border-radius: 20px 20px 0 0;
+      width: 100%; max-height: 82vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      padding-bottom: var(--safe-bot);
+    }
+    .sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
+    .sheet-title { font-size: 17px; font-weight: 800; padding: 14px 20px 10px; flex-shrink: 0; }
+    .sheet-search {
+      margin: 0 16px 10px; flex-shrink: 0;
+      background: var(--surface-hi); border: 1px solid var(--border); border-radius: var(--r-sm);
+      color: var(--text); font-size: 16px; padding: 11px 16px;
+    }
+    .sheet-search:focus { outline: none; border-color: var(--muted); }
+    .sheet-list { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; }
+    .sheet-group { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 14px 20px 6px; }
+    .sheet-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; font-size: 15px;
+      border-bottom: 1px solid var(--border); cursor: pointer;
+    }
+    .sheet-item:last-child { border-bottom: none; }
+    .sheet-item:active { background: var(--surface-hi); }
+    .sheet-item.added { color: var(--dim); cursor: default; }
+    .sheet-item.added:active { background: none; }
+    .sheet-item-badge { font-size: 11px; color: var(--dim); font-weight: 600; }
+    .sheet-item-arrow { font-size: 18px; color: var(--dim); }
+
+    /* ── CONFIRM DIALOG ──────────────────────────────────────── */
+    .dlg-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .dlg-box { background: var(--surface-hi); border-radius: var(--r); padding: 24px 20px 20px; width: 100%; max-width: 320px; }
+    .dlg-title { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+    .dlg-body  { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.55; }
+    .dlg-actions { display: flex; gap: 10px; }
+    .dlg-btn { flex: 1; padding: 14px; border-radius: var(--r-sm); font-size: 15px; font-weight: 700; }
+    .dlg-cancel  { background: var(--surface); color: var(--text); }
+    .dlg-confirm { background: var(--danger); color: #fff; }
+
+    /* ── TOAST ───────────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: calc(var(--safe-bot) + 24px);
+      left: 50%; transform: translateX(-50%);
+      background: var(--success); color: #fff;
+      font-size: 14px; font-weight: 600;
+      padding: 11px 22px; border-radius: 100px;
+      white-space: nowrap; z-index: 400;
+      animation: toastIn .22s ease;
+      pointer-events: none;
+    }
+    .toast.err-toast { background: var(--danger); }
+    @keyframes toastIn {
+      from { transform: translateX(-50%) translateY(14px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ================================================================
+   CONFIG
+================================================================ */
+const SB_URL = 'https://hheylohhxtpwygalzdzu.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoZXlsb2hoeHRwd3lnYWx6ZHp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMjUxNTEsImV4cCI6MjA5NzkwMTE1MX0.-Se4gjWmVec4zE4rkzQU6TB6z0xB2Xhbb2O0Hv2UB2I';
+
+/* ================================================================
+   DATA
+================================================================ */
+const DEFAULTS = {
+  Pull: ['Lat Pulldown', 'Seated Cable Row', 'Assisted Pull-Ups', 'DB Curl', 'Face Pull'],
+  Push: ['Machine Chest Press', 'Machine Shoulder Press', 'DB Lateral Raise', 'Cable Tricep Pushdown (Rope)', 'Rear Delt Fly Machine'],
+  Legs: ['Leg Press', 'RDL', 'Bulgarian Split Squat', 'Leg Press Calf Raise', 'Cable Crunch'],
+};
+
+const LIBRARY = {
+  'Back':                ['Lat Pulldown','Seated Cable Row','Assisted Pull-Ups','Pull-Ups','Chest-Supported Row','Bent Over Barbell Row','Single-Arm DB Row','T-Bar Row','Straight-Arm Pulldown','Inverted Row','Machine Row'],
+  'Chest':               ['Machine Chest Press','Barbell Bench Press','Incline Barbell Bench Press','DB Bench Press','Incline DB Press','Pec Deck','Cable Chest Fly (Low to High)','Cable Chest Fly (High to Low)'],
+  'Shoulders':           ['Machine Shoulder Press','DB Shoulder Press','Barbell Overhead Press','DB Lateral Raise','Cable Lateral Raise','Face Pull','Rear Delt Fly Machine','DB Rear Delt Fly'],
+  'Biceps':              ['DB Curl','Barbell Curl','Cable Curl','Hammer Curl','Incline DB Curl','Preacher Curl Machine','Concentration Curl'],
+  'Triceps':             ['Cable Tricep Pushdown (Rope)','Cable Tricep Pushdown (Bar)','Overhead Cable Tricep Extension','DB Skull Crusher','Barbell Skull Crusher','DB Overhead Tricep Extension','Machine Tricep Dip'],
+  'Quads':               ['Leg Press','Barbell Squat','Goblet Squat','Hack Squat Machine','Leg Extension Machine','Bulgarian Split Squat','DB Lunge','Walking Lunge'],
+  'Hamstrings & Glutes': ['RDL','Barbell Deadlift','DB RDL','Leg Curl Machine (Seated)','Leg Curl Machine (Lying)','Hip Thrust Machine','Barbell Hip Thrust','Cable Pull-Through','Good Morning'],
+  'Calves':              ['Leg Press Calf Raise','Standing Calf Raise Machine','Seated Calf Raise Machine','DB Calf Raise'],
+  'Core':                ['Cable Crunch','Ab Wheel Rollout','Hanging Leg Raise','Machine Crunch','Plank','Dead Bug','Russian Twist'],
+  'Traps':               ['DB Shrug','Barbell Shrug','Machine Shrug','Cable Upright Row'],
+};
+
+const COLORS = { Pull: '#7ba7ff', Push: '#ff8c5a', Legs: '#5ec981' };
+const SETS_PER_EX = 3;
+
+/* ================================================================
+   STATE
+================================================================ */
+const S = {
+  view: 'home',         // 'home' | 'log' | 'history'
+  prevView: 'home',
+  // home
+  last: {},             // { Pull: {id, date} | null, ... }
+  homeLoading: true,
+  homeError: null,
+  // log session
+  day: null,
+  date: null,
+  exercises: [],        // [{ name, sets: [{weight, reps}] }]
+  saving: false,
+  logError: null,
+  // history
+  histEx: null,
+  histData: [],
+  histLoading: false,
+  histError: null,
+  // add exercise sheet
+  showAdd: false,
+  query: '',
+  // abandon confirm
+  showConfirm: false,
+};
+
+/* ================================================================
+   SUPABASE
+================================================================ */
+async function db(method, path, body) {
+  const headers = {
+    'apikey': SB_KEY,
+    'Authorization': `Bearer ${SB_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  if (method === 'POST') headers['Prefer'] = 'return=representation';
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method, headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function loadLast() {
+  const result = {};
+  await Promise.all(Object.keys(DEFAULTS).map(async day => {
+    const rows = await db('GET', `sessions?day_type=eq.${day}&order=date.desc&limit=1&select=id,date`);
+    result[day] = rows?.length ? rows[0] : null;
+  }));
+  return result;
+}
+
+async function doSave() {
+  const [sess] = await db('POST', 'sessions', { day_type: S.day, date: S.date });
+  const sets = [];
+  S.exercises.forEach(ex => {
+    ex.sets.forEach((s, i) => {
+      const w = parseFloat(s.weight), r = parseInt(s.reps, 10);
+      if (!isNaN(w) && !isNaN(r) && w > 0 && r > 0) {
+        sets.push({ session_id: sess.id, exercise_name: ex.name, set_number: i + 1, weight_kg: w, reps: r });
+      }
+    });
+  });
+  if (sets.length) await db('POST', 'sets', sets);
+}
+
+async function loadHistory(name) {
+  const enc = encodeURIComponent(name);
+  return await db('GET', `sets?exercise_name=eq.${enc}&select=set_number,weight_kg,reps,sessions(date,day_type)&order=created_at.desc`) || [];
+}
+
+/* ================================================================
+   HELPERS
+================================================================ */
+function todayStr() {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+function fmtDate(s) {
+  if (!s) return null;
+  const [, m, d] = s.split('-').map(Number);
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d} ${MONTHS[m - 1]}`;
+}
+
+function daysAgo(s) {
+  if (!s) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  const then = new Date(y, m - 1, d);
+  const now  = new Date(); now.setHours(0, 0, 0, 0);
+  const diff = Math.round((now - then) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return `${diff}d ago`;
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
+
+function filteredLib() {
+  const q = S.query.toLowerCase().trim();
+  const out = {};
+  Object.entries(LIBRARY).forEach(([g, exs]) => {
+    const f = q ? exs.filter(e => e.toLowerCase().includes(q)) : exs;
+    if (f.length) out[g] = f;
+  });
+  return out;
+}
+
+function blankSets() {
+  return Array.from({ length: SETS_PER_EX }, () => ({ weight: '', reps: '' }));
+}
+
+let toastTimer;
+function showToast(msg, err = false) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const el = document.createElement('div');
+  el.className = 'toast' + (err ? ' err-toast' : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.remove(), 2600);
+}
+
+/* ================================================================
+   ACTIONS
+================================================================ */
+function startSession(day) {
+  S.day       = day;
+  S.date      = todayStr();
+  S.exercises = DEFAULTS[day].map(name => ({ name, sets: blankSets() }));
+  S.logError  = null;
+  S.prevView  = 'home';
+  S.view      = 'log';
+  render();
+}
+
+function removeExercise(idx) {
+  S.exercises.splice(idx, 1);
+  render();
+}
+
+function addExercise(name) {
+  if (S.exercises.find(e => e.name === name)) return;
+  S.exercises.push({ name, sets: blankSets() });
+  closeAddSheet();
+}
+
+function openAddSheet() {
+  S.showAdd = true;
+  S.query   = '';
+  renderAddSheet();
+}
+
+function closeAddSheet() {
+  S.showAdd = false;
+  S.query   = '';
+  document.getElementById('add-sheet')?.remove();
+  render();
+}
+
+async function finishSession() {
+  const hasData = S.exercises.some(ex => ex.sets.some(s => s.weight && s.reps));
+  if (!hasData) { showToast('Log at least one set first', true); return; }
+  S.saving   = true;
+  S.logError = null;
+  render();
+  try {
+    await doSave();
+    S.saving = false;
+    S.view   = 'home';
+    render();
+    showToast('Session saved! 💪');
+    // Refresh last-session dates in background
+    loadLast().then(last => { S.last = last; render(); }).catch(() => {});
+  } catch (e) {
+    S.saving   = false;
+    S.logError = 'Could not save — check your connection and try again.';
+    render();
+  }
+}
+
+async function openHistory(name) {
+  S.prevView    = S.view;
+  S.histEx      = name;
+  S.histData    = [];
+  S.histLoading = true;
+  S.histError   = null;
+  S.view        = 'history';
+  render();
+  try {
+    S.histData    = await loadHistory(name);
+    S.histLoading = false;
+    render();
+  } catch (e) {
+    S.histLoading = false;
+    S.histError   = 'Could not load history.';
+    render();
+  }
+}
+
+function goBack() {
+  if (S.view === 'history') {
+    S.view = S.prevView;
+    render();
+    return;
+  }
+  if (S.view === 'log') {
+    const dirty = S.exercises.some(ex => ex.sets.some(s => s.weight || s.reps));
+    if (dirty) { S.showConfirm = true; render(); }
+    else        { S.view = 'home'; render(); }
+  }
+}
+
+/* ================================================================
+   SYNC — read live DOM input values into state before re-render
+================================================================ */
+function syncInputs() {
+  document.querySelectorAll('.set-input[data-ei]').forEach(el => {
+    const ei = +el.dataset.ei, si = +el.dataset.si, f = el.dataset.field;
+    if (S.exercises[ei]?.sets[si]) S.exercises[ei].sets[si][f] = el.value;
+  });
+}
+
+/* ================================================================
+   RENDER
+================================================================ */
+const APP = document.getElementById('app');
+
+function render() {
+  syncInputs();
+  if (S.view === 'home')    APP.innerHTML = homeHTML();
+  if (S.view === 'log')     APP.innerHTML = logHTML();
+  if (S.view === 'history') APP.innerHTML = historyHTML();
+  if (S.showConfirm) mountConfirmDialog();
+}
+
+/* ── HOME ──────────────────────────────────────────────────────── */
+function homeHTML() {
+  const cards = Object.keys(DEFAULTS).map(day => {
+    const last  = S.last[day];
+    const color = COLORS[day];
+    const exStr = DEFAULTS[day].slice(0, 3).join(', ') + (DEFAULTS[day].length > 3 ? ` +${DEFAULTS[day].length - 3}` : '');
+    return `
+      <div class="day-card" data-action="start" data-day="${day}">
+        <div class="day-stripe" style="background:${color}"></div>
+        <div class="day-body">
+          <div class="day-type" style="color:${color}">${day}</div>
+          <div class="day-exs">${exStr}</div>
+        </div>
+        <div class="day-right">
+          ${last
+            ? `<div class="day-date">${fmtDate(last.date)}</div>
+               <div class="day-ago" style="color:${color}">${daysAgo(last.date)}</div>`
+            : `<div class="day-date" style="color:var(--dim)">Not started</div>`}
+        </div>
+        <div class="day-arrow">›</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="home">
+      <div class="home-greeting">${greeting()}.</div>
+      <div class="home-sub">Which session today?</div>
+      ${S.homeError ? `<div class="err">${S.homeError}</div>` : ''}
+      ${S.homeLoading
+        ? `<div class="spinner">Loading…</div>`
+        : `<div class="sec-label">Sessions</div><div class="day-cards">${cards}</div>`}
+    </div>`;
+}
+
+/* ── LOG ───────────────────────────────────────────────────────── */
+function logHTML() {
+  const color = COLORS[S.day];
+
+  const exCards = S.exercises.map((ex, ei) => {
+    const rows = ex.sets.map((s, si) => `
+      <div class="set-row">
+        <div class="set-num">S${si + 1}</div>
+        <div class="set-field">
+          <input class="set-input" type="text" inputmode="decimal"
+            placeholder="—" value="${s.weight}"
+            data-ei="${ei}" data-si="${si}" data-field="weight">
+          <div class="set-unit">kg</div>
+        </div>
+        <div class="set-field">
+          <input class="set-input" type="text" inputmode="numeric"
+            placeholder="—" value="${s.reps}"
+            data-ei="${ei}" data-si="${si}" data-field="reps">
+          <div class="set-unit">reps</div>
+        </div>
+      </div>`).join('');
+
+    return `
+      <div class="ex-card">
+        <div class="ex-hdr">
+          <div>
+            <div class="ex-name" data-action="history" data-exercise="${ex.name}">${ex.name}</div>
+            <div class="ex-hint">↗ View history</div>
+          </div>
+          <button class="ex-remove" data-action="remove" data-idx="${ei}" aria-label="Remove ${ex.name}">×</button>
+        </div>
+        <div>${rows}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div data-day="${S.day}">
+      <div class="hdr">
+        <button class="hdr-back" data-action="back">‹</button>
+        <div>
+          <div class="hdr-title" style="color:${color}">${S.day}</div>
+          <div class="hdr-sub">${fmtDate(S.date)} · ${SETS_PER_EX} sets per exercise</div>
+        </div>
+      </div>
+      <div class="log">
+        ${S.logError ? `<div class="err">${S.logError}</div>` : ''}
+        ${exCards}
+        <button class="add-ex-btn" data-action="add">＋ Add exercise</button>
+        <button class="finish-btn" data-action="finish" ${S.saving ? 'disabled' : ''}>
+          ${S.saving ? 'Saving…' : 'Finish Session'}
+        </button>
+      </div>
+    </div>`;
+}
+
+/* ── HISTORY ───────────────────────────────────────────────────── */
+function historyHTML() {
+  let body;
+
+  if (S.histLoading) {
+    body = `<div class="spinner">Loading…</div>`;
+  } else if (S.histError) {
+    body = `<div class="err">${S.histError}</div>`;
+  } else if (!S.histData.length) {
+    body = `
+      <div class="empty">
+        <div class="empty-icon">📊</div>
+        <div class="empty-text">No history yet.<br>Log a set to see it here.</div>
+      </div>`;
+  } else {
+    const rows = S.histData.map(r => {
+      const sess  = r.sessions || {};
+      const dc    = COLORS[sess.day_type] || 'var(--muted)';
+      return `
+        <tr>
+          <td class="td-date">
+            ${fmtDate(sess.date) || '—'}
+            <div class="td-date-tag" style="color:${dc}">${sess.day_type || ''}</div>
+          </td>
+          <td class="td-set">${r.set_number}</td>
+          <td class="td-num">${r.weight_kg}<span> kg</span></td>
+          <td class="td-num">${r.reps}<span> reps</span></td>
+        </tr>`;
+    }).join('');
+
+    body = `
+      <div class="hist-meta">${S.histData.length} sets logged</div>
+      <div class="hist-wrap">
+        <table class="hist-table">
+          <thead><tr>
+            <th>Date</th><th>Set</th><th>Weight</th><th>Reps</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  return `
+    <div>
+      <div class="hdr">
+        <button class="hdr-back" data-action="back">‹</button>
+        <div>
+          <div class="hdr-title">${S.histEx}</div>
+          <div class="hdr-sub">All logged sets · newest first</div>
+        </div>
+      </div>
+      <div class="history">${body}</div>
+    </div>`;
+}
+
+/* ================================================================
+   ADD EXERCISE SHEET
+================================================================ */
+function sheetItemsHTML(added) {
+  const lib = filteredLib();
+  if (!Object.keys(lib).length) {
+    return `<div class="empty" style="padding:24px 20px"><div class="empty-text">No exercises found.</div></div>`;
+  }
+  return Object.entries(lib).map(([group, exs]) =>
+    `<div class="sheet-group">${group}</div>` +
+    exs.map(name => {
+      const yes = added.has(name);
+      return `<div class="sheet-item ${yes ? 'added' : ''}" data-action="${yes ? '' : 'pick'}" data-exercise="${name}">
+        <span>${name}</span>
+        ${yes
+          ? `<span class="sheet-item-badge">Added</span>`
+          : `<span class="sheet-item-arrow">›</span>`}
+      </div>`;
+    }).join('')
+  ).join('');
+}
+
+function renderAddSheet() {
+  document.getElementById('add-sheet')?.remove();
+
+  const added = new Set(S.exercises.map(e => e.name));
+  const wrap  = document.createElement('div');
+  wrap.id     = 'add-sheet';
+  wrap.innerHTML = `
+    <div class="overlay" id="add-overlay">
+      <div class="sheet" onclick="event.stopPropagation()">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">Add Exercise</div>
+        <input id="sheet-search" class="sheet-search" type="text" inputmode="search"
+          placeholder="Search exercises…" value="${S.query}"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <div class="sheet-list" id="sheet-list">${sheetItemsHTML(added)}</div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(wrap);
+
+  // Tap overlay to close
+  document.getElementById('add-overlay').addEventListener('click', closeAddSheet);
+
+  // Search
+  const searchEl = document.getElementById('sheet-search');
+  searchEl.focus();
+  searchEl.addEventListener('input', e => {
+    S.query = e.target.value;
+    const added2 = new Set(S.exercises.map(ex => ex.name));
+    document.getElementById('sheet-list').innerHTML = sheetItemsHTML(added2);
+    bindPickItems();
+  });
+
+  bindPickItems();
+}
+
+function bindPickItems() {
+  document.querySelectorAll('[data-action="pick"]').forEach(el => {
+    el.addEventListener('click', () => addExercise(el.dataset.exercise));
+  });
+}
+
+/* ================================================================
+   CONFIRM DIALOG
+================================================================ */
+function mountConfirmDialog() {
+  document.getElementById('confirm-wrap')?.remove();
+  const wrap = document.createElement('div');
+  wrap.id    = 'confirm-wrap';
+  wrap.innerHTML = `
+    <div class="dlg-overlay">
+      <div class="dlg-box">
+        <div class="dlg-title">Abandon session?</div>
+        <div class="dlg-body">You've entered some data — going back will discard it.</div>
+        <div class="dlg-actions">
+          <button class="dlg-btn dlg-cancel"  id="dlg-cancel">Keep going</button>
+          <button class="dlg-btn dlg-confirm" id="dlg-confirm">Discard</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+
+  document.getElementById('dlg-cancel').onclick = () => {
+    S.showConfirm = false;
+    wrap.remove();
+  };
+  document.getElementById('dlg-confirm').onclick = () => {
+    S.showConfirm = false;
+    wrap.remove();
+    S.view = 'home';
+    render();
+  };
+}
+
+/* ================================================================
+   EVENT DELEGATION — single listener, never duplicated
+================================================================ */
+APP.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === 'start')   startSession(el.dataset.day);
+  if (a === 'back')    goBack();
+  if (a === 'remove')  removeExercise(+el.dataset.idx);
+  if (a === 'add')     openAddSheet();
+  if (a === 'finish')  finishSession();
+  if (a === 'history') openHistory(el.dataset.exercise);
+});
+
+APP.addEventListener('input', e => {
+  const el = e.target;
+  if (el.dataset.ei !== undefined) {
+    const ei = +el.dataset.ei, si = +el.dataset.si, f = el.dataset.field;
+    if (S.exercises[ei]?.sets[si]) S.exercises[ei].sets[si][f] = el.value;
+  }
+});
+
+/* ================================================================
+   INIT
+================================================================ */
+async function init() {
+  S.homeLoading = true;
+  render();
+  try {
+    S.last        = await loadLast();
+    S.homeLoading = false;
+  } catch (e) {
+    S.homeLoading = false;
+    S.homeError   = 'Could not connect to database. Check your internet connection.';
+  }
+  render();
+}
+
+init();
+</script>
+</body>
+</html>

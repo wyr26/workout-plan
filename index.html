@@ -179,19 +179,6 @@
     /* ── HISTORY ─────────────────────────────────────────────── */
     .history { padding: 0 16px; }
     .hist-meta { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
-    .hist-group { margin-bottom: 16px; }
-    .hist-group-hdr {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 8px;
-    }
-    .hist-group-date { font-size: 15px; font-weight: 700; }
-    .hist-group-tag  { font-size: 11px; font-weight: 700; margin-left: 8px; letter-spacing: .4px; }
-    .hist-group-del {
-      font-size: 12px; font-weight: 600; color: var(--dim);
-      padding: 5px 10px; border-radius: var(--r-sm);
-      border: 1px solid var(--border);
-    }
-    .hist-group-del:active { color: var(--danger); border-color: var(--danger); background: rgba(224,82,82,.08); }
     .hist-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
     .hist-table { width: 100%; border-collapse: collapse; }
     .hist-table th {
@@ -201,6 +188,8 @@
     }
     .hist-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); }
     .hist-table tr:last-child td { border-bottom: none; }
+    .td-date { font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .td-date-tag { font-size: 10px; font-weight: 700; margin-top: 2px; }
     .td-set { font-size: 12px; color: var(--dim); text-align: center; }
     .td-num { font-size: 17px; font-weight: 800; }
     .td-num span { font-size: 11px; font-weight: 400; color: var(--muted); }
@@ -334,9 +323,6 @@ const S = {
   query: '',
   // abandon confirm
   showConfirm: false,
-  // delete history entry confirm
-  showDeleteConfirm: false,
-  deleteTarget: null,   // { sessionId, date }
 };
 
 /* ================================================================
@@ -383,27 +369,7 @@ async function doSave() {
 
 async function loadHistory(name) {
   const enc = encodeURIComponent(name);
-  return await db('GET', `sets?exercise_name=eq.${enc}&select=session_id,set_number,weight_kg,reps,sessions(date,day_type)&order=created_at.desc`) || [];
-}
-
-async function deleteHistoryEntry(sessionId) {
-  const enc = encodeURIComponent(S.histEx);
-  await db('DELETE', `sets?session_id=eq.${sessionId}&exercise_name=eq.${enc}`);
-}
-
-function groupHistBySession(data) {
-  const map = new Map();
-  data.forEach(row => {
-    const sid = row.session_id;
-    if (!map.has(sid)) {
-      map.set(sid, { sessionId: sid, date: row.sessions?.date, dayType: row.sessions?.day_type, sets: [] });
-    }
-    map.get(sid).sets.push(row);
-  });
-  const groups = [...map.values()];
-  groups.forEach(g => g.sets.sort((a, b) => a.set_number - b.set_number));
-  groups.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  return groups;
+  return await db('GET', `sets?exercise_name=eq.${enc}&select=set_number,weight_kg,reps,sessions(date,day_type)&order=created_at.desc`) || [];
 }
 
 /* ================================================================
@@ -582,8 +548,7 @@ function render() {
   if (S.view === 'home')    APP.innerHTML = homeHTML();
   if (S.view === 'log')     APP.innerHTML = logHTML();
   if (S.view === 'history') APP.innerHTML = historyHTML();
-  if (S.showConfirm)       mountConfirmDialog();
-  if (S.showDeleteConfirm) mountDeleteConfirmDialog();
+  if (S.showConfirm) mountConfirmDialog();
 }
 
 /* ── HOME ──────────────────────────────────────────────────────── */
@@ -690,39 +655,31 @@ function historyHTML() {
         <div class="empty-text">No history yet.<br>Log a set to see it here.</div>
       </div>`;
   } else {
-    const groups = groupHistBySession(S.histData);
-    const groupsHTML = groups.map(g => {
-      const dc = COLORS[g.dayType] || 'var(--muted)';
-      const rows = g.sets.map(r => `
+    const rows = S.histData.map(r => {
+      const sess  = r.sessions || {};
+      const dc    = COLORS[sess.day_type] || 'var(--muted)';
+      return `
         <tr>
+          <td class="td-date">
+            ${fmtDate(sess.date) || '—'}
+            <div class="td-date-tag" style="color:${dc}">${sess.day_type || ''}</div>
+          </td>
           <td class="td-set">${r.set_number}</td>
           <td class="td-num">${r.weight_kg}<span> kg</span></td>
           <td class="td-num">${r.reps}<span> reps</span></td>
-        </tr>`).join('');
-      return `
-        <div class="hist-group">
-          <div class="hist-group-hdr">
-            <div>
-              <span class="hist-group-date">${fmtDate(g.date) || '—'}</span>
-              <span class="hist-group-tag" style="color:${dc}">${g.dayType || ''}</span>
-            </div>
-            <button class="hist-group-del"
-              data-action="delete-entry"
-              data-session-id="${g.sessionId}"
-              data-date="${g.date}">Delete</button>
-          </div>
-          <div class="hist-wrap">
-            <table class="hist-table">
-              <thead><tr><th>Set</th><th>Weight</th><th>Reps</th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-        </div>`;
+        </tr>`;
     }).join('');
 
     body = `
-      <div class="hist-meta">${S.histData.length} set${S.histData.length !== 1 ? 's' : ''} across ${groups.length} session${groups.length !== 1 ? 's' : ''}</div>
-      ${groupsHTML}`;
+      <div class="hist-meta">${S.histData.length} sets logged</div>
+      <div class="hist-wrap">
+        <table class="hist-table">
+          <thead><tr>
+            <th>Date</th><th>Set</th><th>Weight</th><th>Reps</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
   }
 
   return `
@@ -835,58 +792,6 @@ function mountConfirmDialog() {
 }
 
 /* ================================================================
-   DELETE HISTORY ENTRY DIALOG
-================================================================ */
-function mountDeleteConfirmDialog() {
-  document.getElementById('delete-confirm-wrap')?.remove();
-  const { sessionId, date } = S.deleteTarget;
-  const wrap = document.createElement('div');
-  wrap.id = 'delete-confirm-wrap';
-  wrap.innerHTML = `
-    <div class="dlg-overlay">
-      <div class="dlg-box">
-        <div class="dlg-title">Delete entry?</div>
-        <div class="dlg-body">This will permanently remove all sets for <strong>${S.histEx}</strong> logged on ${fmtDate(date)}.</div>
-        <div class="dlg-actions">
-          <button class="dlg-btn dlg-cancel" id="del-cancel">Cancel</button>
-          <button class="dlg-btn dlg-confirm" id="del-confirm">Delete</button>
-        </div>
-      </div>
-    </div>`;
-  document.body.appendChild(wrap);
-
-  document.getElementById('del-cancel').onclick = () => {
-    S.showDeleteConfirm = false;
-    S.deleteTarget = null;
-    wrap.remove();
-  };
-
-  document.getElementById('del-confirm').onclick = async () => {
-    wrap.remove();
-    S.showDeleteConfirm = false;
-    S.histData = S.histData.filter(r => r.session_id !== sessionId);
-    S.deleteTarget = null;
-    render();
-    try {
-      await deleteHistoryEntry(sessionId);
-      showToast('Entry deleted');
-    } catch (_) {
-      showToast('Could not delete — try again', true);
-      S.histLoading = true;
-      render();
-      try {
-        S.histData = await loadHistory(S.histEx);
-        S.histLoading = false;
-      } catch (e) {
-        S.histError = 'Could not reload history.';
-        S.histLoading = false;
-      }
-      render();
-    }
-  };
-}
-
-/* ================================================================
    EVENT DELEGATION — single listener, never duplicated
 ================================================================ */
 APP.addEventListener('click', e => {
@@ -898,12 +803,7 @@ APP.addEventListener('click', e => {
   if (a === 'remove')  removeExercise(+el.dataset.idx);
   if (a === 'add')     openAddSheet();
   if (a === 'finish')  finishSession();
-  if (a === 'history')      openHistory(el.dataset.exercise);
-  if (a === 'delete-entry') {
-    S.showDeleteConfirm = true;
-    S.deleteTarget = { sessionId: el.dataset.sessionId, date: el.dataset.date };
-    mountDeleteConfirmDialog();
-  }
+  if (a === 'history') openHistory(el.dataset.exercise);
 });
 
 APP.addEventListener('input', e => {

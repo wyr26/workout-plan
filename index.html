@@ -277,8 +277,8 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 ================================================================ */
 const DEFAULTS = {
   Pull: ['Lat Pulldown', 'Seated Cable Row', 'Assisted Pull-Ups', 'DB Curl', 'Face Pull'],
-  Push: ['Machine Chest Press', 'Machine Shoulder Press', 'DB Lateral Raise', 'Cable Tricep Pushdown (Rope)', 'Rear Delt Fly Machine'],
-  Legs: ['Leg Press', 'RDL', 'Bulgarian Split Squat', 'Leg Press Calf Raise', 'Cable Crunch'],
+  Push: ['Machine Chest Press', 'Machine Shoulder Press', 'DB Lateral Raise', 'Cable Tricep Pushdown (Rope)', 'DB Rear Delt Fly'],
+  Legs: ['Seated Leg Press', 'Incline Leg Press', 'RDL', 'Bulgarian Split Squat', 'Leg Press Calf Raise', 'Cable Crunch'],
 };
 
 const LIBRARY = {
@@ -287,10 +287,10 @@ const LIBRARY = {
   'Shoulders':           ['Machine Shoulder Press','DB Shoulder Press','Barbell Overhead Press','DB Lateral Raise','Cable Lateral Raise','Face Pull','Rear Delt Fly Machine','DB Rear Delt Fly'],
   'Biceps':              ['DB Curl','Barbell Curl','Cable Curl','Hammer Curl','Incline DB Curl','Preacher Curl Machine','Concentration Curl'],
   'Triceps':             ['Cable Tricep Pushdown (Rope)','Cable Tricep Pushdown (Bar)','Overhead Cable Tricep Extension','DB Skull Crusher','Barbell Skull Crusher','DB Overhead Tricep Extension','Machine Tricep Dip'],
-  'Quads':               ['Leg Press','Barbell Squat','Goblet Squat','Hack Squat Machine','Leg Extension Machine','Bulgarian Split Squat','DB Lunge','Walking Lunge'],
+  'Quads':               ['Seated Leg Press','Incline Leg Press','Barbell Squat','Goblet Squat','Hack Squat Machine','Leg Extension Machine','Bulgarian Split Squat','DB Lunge','Walking Lunge'],
   'Hamstrings & Glutes': ['RDL','Barbell Deadlift','DB RDL','Leg Curl Machine (Seated)','Leg Curl Machine (Lying)','Hip Thrust Machine','Barbell Hip Thrust','Cable Pull-Through','Good Morning'],
   'Calves':              ['Leg Press Calf Raise','Standing Calf Raise Machine','Seated Calf Raise Machine','DB Calf Raise'],
-  'Core':                ['Cable Crunch','Ab Wheel Rollout','Hanging Leg Raise','Machine Crunch','Plank','Dead Bug','Russian Twist'],
+  'Core':                ['Cable Crunch','Ab Wheel Rollout',"Captain's Chair Leg Raise",'Machine Crunch','Plank','Dead Bug','Russian Twist'],
   'Traps':               ['DB Shrug','Barbell Shrug','Machine Shrug','Cable Upright Row'],
 };
 
@@ -468,6 +468,7 @@ function closeAddSheet() {
 }
 
 async function finishSession() {
+  syncInputs(); // capture any values not yet caught by input events
   const hasData = S.exercises.some(ex => ex.sets.some(s => s.weight && s.reps));
   if (!hasData) { showToast('Log at least one set first', true); return; }
   S.saving   = true;
@@ -489,6 +490,7 @@ async function finishSession() {
 }
 
 async function openHistory(name) {
+  syncInputs(); // preserve log values before navigating away
   S.prevView    = S.view;
   S.histEx      = name;
   S.histData    = [];
@@ -514,6 +516,7 @@ function goBack() {
     return;
   }
   if (S.view === 'log') {
+    syncInputs(); // read current inputs before checking dirty state
     const dirty = S.exercises.some(ex => ex.sets.some(s => s.weight || s.reps));
     if (dirty) { S.showConfirm = true; render(); }
     else        { S.view = 'home'; render(); }
@@ -536,7 +539,12 @@ function syncInputs() {
 const APP = document.getElementById('app');
 
 function render() {
-  syncInputs();
+  // NOTE: syncInputs() is intentionally NOT called here.
+  // The input event handler keeps state current on every keystroke.
+  // Calling syncInputs() inside render() caused removed-exercise values
+  // to overwrite the exercises below (old DOM data-ei indices no longer
+  // match state indices after a splice). Call syncInputs() explicitly
+  // only before navigating away from the log view.
   if (S.view === 'home')    APP.innerHTML = homeHTML();
   if (S.view === 'log')     APP.innerHTML = logHTML();
   if (S.view === 'history') APP.innerHTML = historyHTML();

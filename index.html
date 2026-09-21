@@ -1073,13 +1073,23 @@ function mountConfirmDialog() {
 /* ================================================================
    EVENT DELEGATION
 ================================================================ */
+APP.addEventListener('mousedown', e => {
+  const el = e.target.closest('[data-action="pickLoc"]');
+  if (!el) return;
+  e.preventDefault(); // keep input focused so :focus-within stays active
+  S.location = el.dataset.loc;
+  render();
+  const inp = document.getElementById('where-input');
+  if (inp) inp.blur();
+});
+
 APP.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const a = el.dataset.action;
   if (a === 'start')    { e.stopPropagation(); startSession(el.dataset.day); }
   if (a === 'act-hist') { e.stopPropagation(); openActivityHistory(el.dataset.day); }
-  if (a === 'pickLoc') { S.location = el.dataset.loc; S.showLocSuggestions = false; render(); return; }
+  if (a === 'pickLoc') return; // handled on mousedown
   if (a === 'back')     goBack();
   if (a === 'remove')   removeExercise(+el.dataset.idx);
   if (a === 'addSet')   addSet(+el.dataset.idx);

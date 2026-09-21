@@ -20,6 +20,7 @@
       --pull:        #7ba7ff;
       --push:        #ff8c5a;
       --legs:        #5ec981;
+      --full-body:   #b47fff;
       --danger:      #e05252;
       --success:     #3dba7a;
       --r:           12px;
@@ -102,6 +103,15 @@
     .day-ago  { font-size: 12px; font-weight: 600; margin-top: 2px; }
     .day-arrow { font-size: 22px; color: var(--dim); flex-shrink: 0; margin-right: 4px; }
 
+    /* activity history link on home card */
+    .day-hist-btn {
+      font-size: 11px; font-weight: 600;
+      color: var(--dim); margin-top: 4px;
+      padding: 2px 0;
+      display: inline-block;
+    }
+    .day-hist-btn:active { color: var(--muted); }
+
     /* ── LOG ────────────────────────────────────────────────── */
     .log { padding: 0 16px; }
 
@@ -126,7 +136,7 @@
     .ex-remove { color: var(--dim); font-size: 24px; line-height: 1; padding: 0 4px 0 12px; flex-shrink: 0; }
     .ex-remove:active { color: var(--danger); }
 
-    /* Set rows — signature element: scoreboard readout */
+    /* Set rows */
     .set-row {
       display: grid;
       grid-template-columns: 28px 1fr 1fr;
@@ -159,10 +169,11 @@
     }
     .add-set-btn:active { color: var(--success); }
 
-    /* day-aware focus ring */
-    [data-day="Pull"] .set-input:focus { border-color: var(--pull); }
-    [data-day="Push"] .set-input:focus { border-color: var(--push); }
-    [data-day="Legs"] .set-input:focus { border-color: var(--legs); }
+    /* day-aware focus rings */
+    [data-day="Pull"]      .set-input:focus { border-color: var(--pull); }
+    [data-day="Push"]      .set-input:focus { border-color: var(--push); }
+    [data-day="Legs"]      .set-input:focus { border-color: var(--legs); }
+    [data-day="Full Body"] .set-input:focus { border-color: var(--full-body); }
 
     .add-ex-btn {
       width: 100%;
@@ -183,6 +194,37 @@
     .finish-btn:active { opacity: .85; }
     .finish-btn:disabled { opacity: .45; cursor: default; }
 
+    /* ── WHERE FIELD ────────────────────────────────────────── */
+    .where-wrap { margin-bottom: 12px; position: relative; }
+    .where-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 6px;
+    }
+    .where-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r);
+      color: var(--text);
+      font-size: 15px;
+      padding: 13px 16px;
+      -webkit-appearance: none;
+    }
+    .where-input:focus { outline: none; border-color: var(--muted); background: rgba(255,255,255,.02); }
+    .where-input::placeholder { color: var(--dim); }
+
+    /* ── NON-GYM LOG ────────────────────────────────────────── */
+    .activity-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 48px 20px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .activity-icon  { font-size: 52px; margin-bottom: 12px; }
+    .activity-last  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
     /* ── HISTORY ─────────────────────────────────────────────── */
     .history { padding: 0 16px; }
     .hist-meta { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
@@ -197,9 +239,22 @@
     .hist-table tr:last-child td { border-bottom: none; }
     .td-date { font-size: 13px; color: var(--muted); white-space: nowrap; }
     .td-date-tag { font-size: 10px; font-weight: 700; margin-top: 2px; }
+    .td-date-loc { font-size: 10px; color: var(--dim); margin-top: 2px; }
     .td-set { font-size: 12px; color: var(--dim); text-align: center; }
     .td-num { font-size: 17px; font-weight: 800; }
     .td-num span { font-size: 11px; font-weight: 400; color: var(--muted); }
+
+    /* ── ACTIVITY HISTORY (non-gym) ──────────────────────────── */
+    .act-hist-list { display: flex; flex-direction: column; gap: 8px; }
+    .act-hist-row {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 16px 18px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .act-hist-date { font-size: 16px; font-weight: 700; }
+    .act-hist-ago  { font-size: 12px; font-weight: 600; }
 
     /* ── SHARED STATES ───────────────────────────────────────── */
     .err {
@@ -282,10 +337,15 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 /* ================================================================
    DATA
 ================================================================ */
+const GYM_TYPES     = ['Pull', 'Push', 'Legs', 'Full Body'];
+const NON_GYM_TYPES = ['Pilates', 'Bouldering', 'Yoga', 'Running', 'Spin'];
+const NON_GYM_ICONS = { Pilates: '🧘', Bouldering: '🧗', Yoga: '🕯️', Running: '🏃', Spin: '🚴' };
+
 const DEFAULTS = {
-  Pull: ['Lat Pulldown', 'Seated Cable Row', 'Assisted Pull-Ups', 'DB Curl', 'Face Pull'],
-  Push: ['Machine Chest Press', 'Machine Shoulder Press', 'DB Lateral Raise', 'Cable Tricep Pushdown (Rope)', 'DB Rear Delt Fly'],
-  Legs: ['Seated Leg Press', 'Incline Leg Press', 'RDL', 'Bulgarian Split Squat', 'Leg Press Calf Raise', 'Cable Crunch'],
+  Pull:       ['Lat Pulldown', 'Seated Cable Row', 'Assisted Pull-Ups', 'DB Curl', 'Face Pull'],
+  Push:       ['Machine Chest Press', 'Machine Shoulder Press', 'DB Lateral Raise', 'Cable Tricep Pushdown (Rope)', 'DB Rear Delt Fly'],
+  Legs:       ['Seated Leg Press', 'Incline Leg Press', 'RDL', 'Bulgarian Split Squat', 'Leg Press Calf Raise', 'Cable Crunch'],
+  'Full Body': [],
 };
 
 const LIBRARY = {
@@ -301,30 +361,47 @@ const LIBRARY = {
   'Traps':               ['DB Shrug','Barbell Shrug','Machine Shrug','Cable Shrug','Cable Upright Row','DB Upright Row'],
 };
 
-const COLORS = { Pull: '#7ba7ff', Push: '#ff8c5a', Legs: '#5ec981' };
+const COLORS = {
+  Pull:       '#7ba7ff',
+  Push:       '#ff8c5a',
+  Legs:       '#5ec981',
+  'Full Body':'#b47fff',
+  Pilates:    '#f9a8d4',
+  Bouldering: '#fb923c',
+  Yoga:       '#86efac',
+  Running:    '#67e8f9',
+  Spin:       '#fde68a',
+};
+
 const SETS_PER_EX = 3;
 
 /* ================================================================
    STATE
 ================================================================ */
 const S = {
-  view: 'home',         // 'home' | 'log' | 'history'
+  view: 'home',       // 'home' | 'log' | 'history' | 'act-hist'
   prevView: 'home',
   // home
-  last: {},             // { Pull: {id, date} | null, ... }
+  last: {},
   homeLoading: true,
   homeError: null,
   // log session
   day: null,
   date: null,
-  exercises: [],        // [{ name, sets: [{weight, reps}] }]
+  exercises: [],
+  location: '',       // gym sessions only
   saving: false,
   logError: null,
-  // history
+  // exercise history
   histEx: null,
   histData: [],
   histLoading: false,
   histError: null,
+  // activity history (non-gym)
+  actHistDay: null,
+  actHistData: [],
+  actHistLoading: false,
+  actHistError: null,
   // add exercise sheet
   showAdd: false,
   query: '',
@@ -353,15 +430,21 @@ async function db(method, path, body) {
 
 async function loadLast() {
   const result = {};
-  await Promise.all(Object.keys(DEFAULTS).map(async day => {
-    const rows = await db('GET', `sessions?day_type=eq.${day}&order=date.desc&limit=1&select=id,date`);
+  const allTypes = [...GYM_TYPES, ...NON_GYM_TYPES];
+  await Promise.all(allTypes.map(async day => {
+    const enc  = encodeURIComponent(day);
+    const rows = await db('GET', `sessions?day_type=eq.${enc}&order=date.desc&limit=1&select=id,date`);
     result[day] = rows?.length ? rows[0] : null;
   }));
   return result;
 }
 
 async function doSave() {
-  const [sess] = await db('POST', 'sessions', { day_type: S.day, date: S.date });
+  const payload = { day_type: S.day, date: S.date };
+  if (GYM_TYPES.includes(S.day) && S.location.trim()) {
+    payload.location = S.location.trim();
+  }
+  const [sess] = await db('POST', 'sessions', payload);
   const sets = [];
   S.exercises.forEach(ex => {
     ex.sets.forEach((s, i) => {
@@ -376,7 +459,12 @@ async function doSave() {
 
 async function loadHistory(name) {
   const enc = encodeURIComponent(name);
-  return await db('GET', `sets?exercise_name=eq.${enc}&select=set_number,weight_kg,reps,sessions(date,day_type)&order=created_at.desc`) || [];
+  return await db('GET', `sets?exercise_name=eq.${enc}&select=set_number,weight_kg,reps,sessions(date,day_type,location)&order=created_at.desc`) || [];
+}
+
+async function loadActivityHistory(day) {
+  const enc = encodeURIComponent(day);
+  return await db('GET', `sessions?day_type=eq.${enc}&order=date.desc&select=id,date&limit=50`) || [];
 }
 
 /* ================================================================
@@ -443,7 +531,8 @@ function showToast(msg, err = false) {
 function startSession(day) {
   S.day       = day;
   S.date      = todayStr();
-  S.exercises = DEFAULTS[day].map(name => ({ name, sets: blankSets() }));
+  S.exercises = (DEFAULTS[day] || []).map(name => ({ name, sets: blankSets() }));
+  S.location  = '';
   S.logError  = null;
   S.prevView  = 'home';
   S.view      = 'log';
@@ -481,9 +570,12 @@ function closeAddSheet() {
 }
 
 async function finishSession() {
-  syncInputs(); // capture any values not yet caught by input events
-  const hasData = S.exercises.some(ex => ex.sets.some(s => s.weight && s.reps));
-  if (!hasData) { showToast('Log at least one set first', true); return; }
+  syncInputs();
+  const isGym = GYM_TYPES.includes(S.day);
+  if (isGym) {
+    const hasData = S.exercises.some(ex => ex.sets.some(s => s.weight && s.reps));
+    if (!hasData) { showToast('Log at least one set first', true); return; }
+  }
   S.saving   = true;
   S.logError = null;
   render();
@@ -493,7 +585,6 @@ async function finishSession() {
     S.view   = 'home';
     render();
     showToast('Session saved! 💪');
-    // Refresh last-session dates in background
     loadLast().then(last => { S.last = last; render(); }).catch(() => {});
   } catch (e) {
     S.saving   = false;
@@ -503,7 +594,7 @@ async function finishSession() {
 }
 
 async function openHistory(name) {
-  syncInputs(); // preserve log values before navigating away
+  syncInputs();
   S.prevView    = S.view;
   S.histEx      = name;
   S.histData    = [];
@@ -522,24 +613,46 @@ async function openHistory(name) {
   }
 }
 
+async function openActivityHistory(day) {
+  S.prevView        = S.view;
+  S.actHistDay      = day;
+  S.actHistData     = [];
+  S.actHistLoading  = true;
+  S.actHistError    = null;
+  S.view            = 'act-hist';
+  render();
+  try {
+    S.actHistData    = await loadActivityHistory(day);
+    S.actHistLoading = false;
+    render();
+  } catch (e) {
+    S.actHistLoading = false;
+    S.actHistError   = 'Could not load history.';
+    render();
+  }
+}
+
 function goBack() {
-  if (S.view === 'history') {
+  if (S.view === 'history' || S.view === 'act-hist') {
     S.view = S.prevView;
     render();
     return;
   }
   if (S.view === 'log') {
-    syncInputs(); // read current inputs before checking dirty state
-    const dirty = S.exercises.some(ex => ex.sets.some(s => s.weight || s.reps));
+    syncInputs();
+    const isGym = GYM_TYPES.includes(S.day);
+    const dirty = isGym && S.exercises.some(ex => ex.sets.some(s => s.weight || s.reps));
     if (dirty) { S.showConfirm = true; render(); }
     else        { S.view = 'home'; render(); }
   }
 }
 
 /* ================================================================
-   SYNC — read live DOM input values into state before re-render
+   SYNC
 ================================================================ */
 function syncInputs() {
+  const whereEl = document.getElementById('where-input');
+  if (whereEl) S.location = whereEl.value;
   document.querySelectorAll('.set-input[data-ei]').forEach(el => {
     const ei = +el.dataset.ei, si = +el.dataset.si, f = el.dataset.field;
     if (S.exercises[ei]?.sets[si]) S.exercises[ei].sets[si][f] = el.value;
@@ -552,40 +665,55 @@ function syncInputs() {
 const APP = document.getElementById('app');
 
 function render() {
-  // NOTE: syncInputs() is intentionally NOT called here.
-  // The input event handler keeps state current on every keystroke.
-  // Calling syncInputs() inside render() caused removed-exercise values
-  // to overwrite the exercises below (old DOM data-ei indices no longer
-  // match state indices after a splice). Call syncInputs() explicitly
-  // only before navigating away from the log view.
-  if (S.view === 'home')    APP.innerHTML = homeHTML();
-  if (S.view === 'log')     APP.innerHTML = logHTML();
-  if (S.view === 'history') APP.innerHTML = historyHTML();
+  if (S.view === 'home')     APP.innerHTML = homeHTML();
+  if (S.view === 'log')      APP.innerHTML = logHTML();
+  if (S.view === 'history')  APP.innerHTML = historyHTML();
+  if (S.view === 'act-hist') APP.innerHTML = actHistoryHTML();
   if (S.showConfirm) mountConfirmDialog();
 }
 
 /* ── HOME ──────────────────────────────────────────────────────── */
 function homeHTML() {
-  const cards = Object.keys(DEFAULTS).map(day => {
+  function makeCard(day) {
     const last  = S.last[day];
-    const color = COLORS[day];
-    const exStr = DEFAULTS[day].slice(0, 3).join(', ') + (DEFAULTS[day].length > 3 ? ` +${DEFAULTS[day].length - 3}` : '');
+    const color = COLORS[day] || 'var(--muted)';
+    const isGym = GYM_TYPES.includes(day);
+
+    let subline;
+    if (isGym) {
+      const exs = DEFAULTS[day] || [];
+      subline = exs.length
+        ? exs.slice(0, 3).join(', ') + (exs.length > 3 ? ` +${exs.length - 3}` : '')
+        : 'Tap to build your workout';
+    } else {
+      subline = NON_GYM_ICONS[day] || '';
+    }
+
+    const histBtn = !isGym
+      ? `<div><button class="day-hist-btn" data-action="act-hist" data-day="${day}">History ›</button></div>`
+      : '';
+
     return `
       <div class="day-card" data-action="start" data-day="${day}">
         <div class="day-stripe" style="background:${color}"></div>
         <div class="day-body">
           <div class="day-type" style="color:${color}">${day}</div>
-          <div class="day-exs">${exStr}</div>
+          <div class="day-exs">${subline}</div>
         </div>
         <div class="day-right">
           ${last
             ? `<div class="day-date">${fmtDate(last.date)}</div>
-               <div class="day-ago" style="color:${color}">${daysAgo(last.date)}</div>`
-            : `<div class="day-date" style="color:var(--dim)">Not started</div>`}
+               <div class="day-ago" style="color:${color}">${daysAgo(last.date)}</div>
+               ${histBtn}`
+            : `<div class="day-date" style="color:var(--dim)">Not started</div>
+               ${histBtn}`}
         </div>
         <div class="day-arrow">›</div>
       </div>`;
-  }).join('');
+  }
+
+  const gymCards = GYM_TYPES.map(makeCard).join('');
+  const actCards = NON_GYM_TYPES.map(makeCard).join('');
 
   return `
     <div class="home">
@@ -594,13 +722,45 @@ function homeHTML() {
       ${S.homeError ? `<div class="err">${S.homeError}</div>` : ''}
       ${S.homeLoading
         ? `<div class="spinner">Loading…</div>`
-        : `<div class="sec-label">Sessions</div><div class="day-cards">${cards}</div>`}
+        : `<div class="sec-label">Gym</div>
+           <div class="day-cards" style="margin-bottom:20px">${gymCards}</div>
+           <div class="sec-label">Activities</div>
+           <div class="day-cards">${actCards}</div>`}
     </div>`;
 }
 
 /* ── LOG ───────────────────────────────────────────────────────── */
 function logHTML() {
-  const color = COLORS[S.day];
+  const color = COLORS[S.day] || 'var(--text)';
+  const isGym = GYM_TYPES.includes(S.day);
+
+  if (!isGym) {
+    const icon = NON_GYM_ICONS[S.day] || '';
+    const last = S.last[S.day];
+    const lastLine = last
+      ? `Last session: ${fmtDate(last.date)} · ${daysAgo(last.date)}`
+      : 'No previous sessions yet';
+    return `
+      <div data-day="${S.day}">
+        <div class="hdr">
+          <button class="hdr-back" data-action="back">‹</button>
+          <div>
+            <div class="hdr-title" style="color:${color}">${S.day}</div>
+            <div class="hdr-sub">${fmtDate(S.date)}</div>
+          </div>
+        </div>
+        <div class="log">
+          ${S.logError ? `<div class="err">${S.logError}</div>` : ''}
+          <div class="activity-card">
+            <div class="activity-icon">${icon}</div>
+            <div class="activity-last">${lastLine}</div>
+          </div>
+          <button class="finish-btn" data-action="finish" ${S.saving ? 'disabled' : ''}>
+            ${S.saving ? 'Saving…' : 'Finish Session'}
+          </button>
+        </div>
+      </div>`;
+  }
 
   const exCards = S.exercises.map((ex, ei) => {
     const rows = ex.sets.map((s, si) => `
@@ -645,6 +805,13 @@ function logHTML() {
       </div>
       <div class="log">
         ${S.logError ? `<div class="err">${S.logError}</div>` : ''}
+        <div class="where-wrap">
+          <div class="where-label">Where</div>
+          <input id="where-input" class="where-input" type="text" inputmode="text"
+            placeholder="Which gym? (optional)"
+            value="${S.location}"
+            autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
+        </div>
         ${exCards}
         <button class="add-ex-btn" data-action="add">＋ Add exercise</button>
         <button class="finish-btn" data-action="finish" ${S.saving ? 'disabled' : ''}>
@@ -654,7 +821,7 @@ function logHTML() {
     </div>`;
 }
 
-/* ── HISTORY ───────────────────────────────────────────────────── */
+/* ── EXERCISE HISTORY ──────────────────────────────────────────── */
 function historyHTML() {
   let body;
 
@@ -670,13 +837,15 @@ function historyHTML() {
       </div>`;
   } else {
     const rows = S.histData.map(r => {
-      const sess  = r.sessions || {};
-      const dc    = COLORS[sess.day_type] || 'var(--muted)';
+      const sess = r.sessions || {};
+      const dc   = COLORS[sess.day_type] || 'var(--muted)';
+      const loc  = sess.location ? `<div class="td-date-loc">📍 ${sess.location}</div>` : '';
       return `
         <tr>
           <td class="td-date">
             ${fmtDate(sess.date) || '—'}
             <div class="td-date-tag" style="color:${dc}">${sess.day_type || ''}</div>
+            ${loc}
           </td>
           <td class="td-set">${r.set_number}</td>
           <td class="td-num">${r.weight_kg}<span> kg</span></td>
@@ -703,6 +872,47 @@ function historyHTML() {
         <div>
           <div class="hdr-title">${S.histEx}</div>
           <div class="hdr-sub">All logged sets · newest first</div>
+        </div>
+      </div>
+      <div class="history">${body}</div>
+    </div>`;
+}
+
+/* ── ACTIVITY HISTORY (non-gym) ────────────────────────────────── */
+function actHistoryHTML() {
+  const color = COLORS[S.actHistDay] || 'var(--muted)';
+  const icon  = NON_GYM_ICONS[S.actHistDay] || '';
+  let body;
+
+  if (S.actHistLoading) {
+    body = `<div class="spinner">Loading…</div>`;
+  } else if (S.actHistError) {
+    body = `<div class="err">${S.actHistError}</div>`;
+  } else if (!S.actHistData.length) {
+    body = `
+      <div class="empty">
+        <div class="empty-icon">${icon}</div>
+        <div class="empty-text">No sessions logged yet.</div>
+      </div>`;
+  } else {
+    const rows = S.actHistData.map(r => `
+      <div class="act-hist-row">
+        <div class="act-hist-date">${fmtDate(r.date)}</div>
+        <div class="act-hist-ago" style="color:${color}">${daysAgo(r.date)}</div>
+      </div>`).join('');
+
+    body = `
+      <div class="hist-meta">${S.actHistData.length} session${S.actHistData.length !== 1 ? 's' : ''} logged</div>
+      <div class="act-hist-list">${rows}</div>`;
+  }
+
+  return `
+    <div>
+      <div class="hdr">
+        <button class="hdr-back" data-action="back">‹</button>
+        <div>
+          <div class="hdr-title" style="color:${color}">${icon} ${S.actHistDay}</div>
+          <div class="hdr-sub">Past sessions · newest first</div>
         </div>
       </div>
       <div class="history">${body}</div>
@@ -751,10 +961,8 @@ function renderAddSheet() {
 
   document.body.appendChild(wrap);
 
-  // Tap overlay to close
   document.getElementById('add-overlay').addEventListener('click', closeAddSheet);
 
-  // Search
   const searchEl = document.getElementById('sheet-search');
   searchEl.focus();
   searchEl.addEventListener('input', e => {
@@ -806,24 +1014,27 @@ function mountConfirmDialog() {
 }
 
 /* ================================================================
-   EVENT DELEGATION — single listener, never duplicated
+   EVENT DELEGATION
 ================================================================ */
 APP.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const a = el.dataset.action;
-  if (a === 'start')   startSession(el.dataset.day);
-  if (a === 'back')    goBack();
-  if (a === 'remove')  removeExercise(+el.dataset.idx);
-  if (a === 'addSet')  addSet(+el.dataset.idx);
-  if (a === 'add')     openAddSheet();
-  if (a === 'finish')  finishSession();
-  if (a === 'history') openHistory(el.dataset.exercise);
+  if (a === 'start')    { e.stopPropagation(); startSession(el.dataset.day); }
+  if (a === 'act-hist') { e.stopPropagation(); openActivityHistory(el.dataset.day); }
+  if (a === 'back')     goBack();
+  if (a === 'remove')   removeExercise(+el.dataset.idx);
+  if (a === 'addSet')   addSet(+el.dataset.idx);
+  if (a === 'add')      openAddSheet();
+  if (a === 'finish')   finishSession();
+  if (a === 'history')  openHistory(el.dataset.exercise);
 });
 
 APP.addEventListener('input', e => {
   const el = e.target;
-  if (el.dataset.ei !== undefined) {
+  if (el.id === 'where-input') {
+    S.location = el.value;
+  } else if (el.dataset.ei !== undefined) {
     const ei = +el.dataset.ei, si = +el.dataset.si, f = el.dataset.field;
     if (S.exercises[ei]?.sets[si]) S.exercises[ei].sets[si][f] = el.value;
   }

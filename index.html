@@ -209,9 +209,28 @@
       font-size: 15px;
       padding: 13px 16px;
       -webkit-appearance: none;
+      box-sizing: border-box;
     }
     .where-input:focus { outline: none; border-color: var(--muted); background: rgba(255,255,255,.02); }
     .where-input::placeholder { color: var(--dim); }
+    .loc-suggestions {
+      display: none;
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 99;
+      background: var(--surface);
+      border: 1.5px solid var(--muted);
+      border-radius: var(--r);
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .where-wrap:focus-within .loc-suggestions { display: block; }
+    .loc-suggestion {
+      padding: 13px 16px;
+      font-size: 15px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .loc-suggestion:not(:last-child) { border-bottom: 1px solid var(--border); }
+    .loc-suggestion:active { background: rgba(255,255,255,.07); }
 
     /* ── NON-GYM LOG ────────────────────────────────────────── */
     .activity-card {
@@ -390,6 +409,7 @@ const S = {
   date: null,
   exercises: [],
   location: '',       // gym sessions only
+  locations: [],      // fetched from locations table
   saving: false,
   logError: null,
   // exercise history
@@ -445,6 +465,10 @@ async function doSave() {
     payload.location = S.location.trim();
   }
   const [sess] = await db('POST', 'sessions', payload);
+  if (payload.location && !S.locations.some(l => l.name === payload.location)) {
+    await upsertLocation(payload.location);
+    S.locations.push({ name: payload.location });
+  }
   const sets = [];
   S.exercises.forEach(ex => {
     ex.sets.forEach((s, i) => {
@@ -460,6 +484,14 @@ async function doSave() {
 async function loadHistory(name) {
   const enc = encodeURIComponent(name);
   return await db('GET', `sets?exercise_name=eq.${enc}&select=set_number,weight_kg,reps,sessions(date,day_type,location)&order=created_at.desc`) || [];
+}
+
+async function loadLocations() {
+  return (await db('GET', 'locations?order=name.asc&select=name')) || [];
+}
+
+async function upsertLocation(name) {
+  await db('POST', 'locations', { name }).catch(() => {});
 }
 
 async function loadActivityHistory(day) {
@@ -565,7 +597,9 @@ function openAddSheet() {
 function closeAddSheet() {
   S.showAdd = false;
   S.query   = '';
-  document.getElementById('add-sheet')?.remove();
+  const sheet = document.getElementById('add-sheet');
+  sheet?._cleanupVV?.();
+  sheet?.remove();
   render();
 }
 
@@ -811,6 +845,12 @@ function logHTML() {
             placeholder="Which gym? (optional)"
             value="${S.location}"
             autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
+          ${S.locations.length ? `
+            <div class="loc-suggestions">
+              ${S.locations
+                .map(l => `<div class="loc-suggestion" data-action="pickLoc" data-loc="${l.name}">${l.name}</div>`)
+                .join('')}
+            </div>` : ''}
         </div>
         ${exCards}
         <button class="add-ex-btn" data-action="add">＋ Add exercise</button>
@@ -963,6 +1003,23 @@ function renderAddSheet() {
 
   document.getElementById('add-overlay').addEventListener('click', closeAddSheet);
 
+  // Keep sheet above the on-screen keyboard on mobile
+  if (window.visualViewport) {
+    const sheetEl = wrap.querySelector('.sheet');
+    const updatePos = () => {
+      const vv = window.visualViewport;
+      const kbHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      sheetEl.style.transform = `translateY(-${kbHeight}px)`;
+      sheetEl.style.maxHeight = `${Math.min(vv.height * 0.9, window.innerHeight * 0.82)}px`;
+    };
+    window.visualViewport.addEventListener('resize', updatePos);
+    window.visualViewport.addEventListener('scroll', updatePos);
+    wrap._cleanupVV = () => {
+      window.visualViewport.removeEventListener('resize', updatePos);
+      window.visualViewport.removeEventListener('scroll', updatePos);
+    };
+  }
+
   const searchEl = document.getElementById('sheet-search');
   searchEl.focus();
   searchEl.addEventListener('input', e => {
@@ -1022,6 +1079,7 @@ APP.addEventListener('click', e => {
   const a = el.dataset.action;
   if (a === 'start')    { e.stopPropagation(); startSession(el.dataset.day); }
   if (a === 'act-hist') { e.stopPropagation(); openActivityHistory(el.dataset.day); }
+  if (a === 'pickLoc') { S.location = el.dataset.loc; S.showLocSuggestions = false; render(); return; }
   if (a === 'back')     goBack();
   if (a === 'remove')   removeExercise(+el.dataset.idx);
   if (a === 'addSet')   addSet(+el.dataset.idx);
@@ -1047,7 +1105,7 @@ async function init() {
   S.homeLoading = true;
   render();
   try {
-    S.last        = await loadLast();
+    [S.last, S.locations] = await Promise.all([loadLast(), loadLocations()]);
     S.homeLoading = false;
   } catch (e) {
     S.homeLoading = false;
